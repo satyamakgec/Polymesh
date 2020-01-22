@@ -1078,7 +1078,7 @@ decl_event! {
         /// ticker, from_did, to_did, value, data, ERC1066 status
         /// 0 - OK
         /// 1,2... - Error, meanings TBD
-        CanTransfer(Vec<u8>, IdentityId, IdentityId, Balance, Vec<u8>, u32),
+        CanTransfer(Ticker, IdentityId, IdentityId, Balance, Vec<u8>, u32),
         /// An additional event to Transfer; emitted when transfer_with_data is called; similar to
         /// Transfer with data added at the end.
         /// ticker, from DID, to DID, value, data
@@ -1269,11 +1269,7 @@ impl<T: Trait> Module<T> {
         // Store ticker registration details
         <Tickers<T>>::insert(ticker, ticker_registration);
 
-        Self::deposit_event(RawEvent::TickerRegistered(
-            *ticker,
-            to_did,
-            expiry,
-        ));
+        Self::deposit_event(RawEvent::TickerRegistered(*ticker, to_did, expiry));
     }
 
     fn charge_ticker_registration_fee(_ticker: &Ticker, _sender: T::AccountId, _did: IdentityId) {
@@ -2082,11 +2078,11 @@ mod tests {
             ));
 
             assert_eq!(
-                Asset::balance_of((token.name.clone(), token.owner_did)),
+                Asset::balance_of((ticker, token.owner_did)),
                 token.total_supply
             );
 
-            assert_eq!(Asset::token_details(token.name.clone()), token);
+            assert_eq!(Asset::token_details(ticker), token);
 
             let asset_rule = general_tm::AssetRule {
                 sender_rules: vec![],
@@ -2097,7 +2093,7 @@ mod tests {
             assert_ok!(GeneralTM::add_active_rule(
                 owner_signed.clone(),
                 owner_did,
-                token.name.clone(),
+                ticker,
                 asset_rule
             ));
 
@@ -2105,7 +2101,7 @@ mod tests {
             assert_ok!(Asset::issue(
                 owner_signed.clone(),
                 owner_did,
-                token.name.clone(),
+                ticker,
                 investor1_did,
                 200_00_00 as u128,
                 vec![0x0]
@@ -2120,7 +2116,7 @@ mod tests {
             assert_noop!(
                 Asset::increase_custody_allowance(
                     investor1_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     custodian_did,
                     250_00_00 as u128
@@ -2133,7 +2129,7 @@ mod tests {
             assert_noop!(
                 Asset::increase_custody_allowance(
                     investor1_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     custodian_did_not_register,
                     50_00_00 as u128
@@ -2144,19 +2140,19 @@ mod tests {
             // Add custodian
             assert_ok!(Asset::increase_custody_allowance(
                 investor1_signed.clone(),
-                token.name.clone(),
+                ticker,
                 investor1_did,
                 custodian_did,
                 50_00_00 as u128
             ));
 
             assert_eq!(
-                Asset::custodian_allowance((token.name.clone(), investor1_did, custodian_did)),
+                Asset::custodian_allowance((ticker, investor1_did, custodian_did)),
                 50_00_00 as u128
             );
 
             assert_eq!(
-                Asset::total_custody_allowance((token.name.clone(), investor1_did)),
+                Asset::total_custody_allowance((ticker, investor1_did)),
                 50_00_00 as u128
             );
 
@@ -2164,13 +2160,13 @@ mod tests {
             assert_ok!(Asset::transfer(
                 investor1_signed.clone(),
                 investor1_did,
-                token.name.clone(),
+                ticker,
                 investor2_did,
                 140_00_00 as u128
             ));
 
             assert_eq!(
-                Asset::balance_of((token.name.clone(), investor2_did)),
+                Asset::balance_of((ticker, investor2_did)),
                 140_00_00 as u128
             );
 
@@ -2179,7 +2175,7 @@ mod tests {
                 Asset::transfer(
                     investor1_signed.clone(),
                     investor1_did,
-                    token.name.clone(),
+                    ticker,
                     investor2_did,
                     50_00_00 as u128
                 ),
@@ -2190,7 +2186,7 @@ mod tests {
             assert_noop!(
                 Asset::transfer_by_custodian(
                     investor2_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     custodian_did,
                     investor2_did,
@@ -2203,7 +2199,7 @@ mod tests {
             assert_noop!(
                 Asset::transfer_by_custodian(
                     custodian_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     custodian_did,
                     investor2_did,
@@ -2215,7 +2211,7 @@ mod tests {
             // Successfully transfer by the custodian
             assert_ok!(Asset::transfer_by_custodian(
                 custodian_signed.clone(),
-                token.name.clone(),
+                ticker,
                 investor1_did,
                 custodian_did,
                 investor2_did,
@@ -2269,11 +2265,11 @@ mod tests {
             ));
 
             assert_eq!(
-                Asset::balance_of((token.name.clone(), token.owner_did)),
+                Asset::balance_of((ticker, token.owner_did)),
                 token.total_supply
             );
 
-            assert_eq!(Asset::token_details(token.name.clone()), token);
+            assert_eq!(Asset::token_details(ticker), token);
 
             let asset_rule = general_tm::AssetRule {
                 sender_rules: vec![],
@@ -2284,7 +2280,7 @@ mod tests {
             assert_ok!(GeneralTM::add_active_rule(
                 owner_signed.clone(),
                 owner_did,
-                token.name.clone(),
+                ticker,
                 asset_rule
             ));
 
@@ -2292,17 +2288,17 @@ mod tests {
             assert_ok!(Asset::issue(
                 owner_signed.clone(),
                 owner_did,
-                token.name.clone(),
+                ticker,
                 investor1_did,
                 200_00_00 as u128,
                 vec![0x0]
             ));
 
             assert_eq!(
-                Asset::balance_of((token.name.clone(), investor1_did)),
+                Asset::balance_of((ticker, investor1_did)),
                 200_00_00 as u128
             );
-            let ticker = Ticker::from_slice(token.name.as_slice());
+
             let msg = SignData {
                 custodian_did: custodian_did,
                 holder_did: investor1_did,
@@ -2316,7 +2312,7 @@ mod tests {
             // Add custodian
             assert_ok!(Asset::increase_custody_allowance_of(
                 investor2_signed.clone(),
-                token.name.clone(),
+                ticker,
                 investor1_did,
                 investor1_acc.clone(),
                 custodian_did,
@@ -2327,12 +2323,12 @@ mod tests {
             ));
 
             assert_eq!(
-                Asset::custodian_allowance((token.name.clone(), investor1_did, custodian_did)),
+                Asset::custodian_allowance((ticker, investor1_did, custodian_did)),
                 50_00_00 as u128
             );
 
             assert_eq!(
-                Asset::total_custody_allowance((token.name.clone(), investor1_did)),
+                Asset::total_custody_allowance((ticker, investor1_did)),
                 50_00_00 as u128
             );
 
@@ -2340,7 +2336,7 @@ mod tests {
             assert_noop!(
                 Asset::increase_custody_allowance_of(
                     investor2_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     investor1_acc.clone(),
                     custodian_did,
@@ -2356,7 +2352,7 @@ mod tests {
             assert_noop!(
                 Asset::increase_custody_allowance_of(
                     investor2_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     investor1_acc.clone(),
                     custodian_did,
@@ -2372,7 +2368,7 @@ mod tests {
             assert_ok!(Asset::transfer(
                 investor1_signed.clone(),
                 investor1_did,
-                token.name.clone(),
+                ticker,
                 investor2_did,
                 140_00_00 as u128
             ));
@@ -2387,7 +2383,7 @@ mod tests {
                 Asset::transfer(
                     investor1_signed.clone(),
                     investor1_did,
-                    token.name.clone(),
+                    ticker,
                     investor2_did,
                     50_00_00 as u128
                 ),
@@ -2398,7 +2394,7 @@ mod tests {
             assert_noop!(
                 Asset::transfer_by_custodian(
                     investor2_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     custodian_did,
                     investor2_did,
@@ -2411,7 +2407,7 @@ mod tests {
             assert_noop!(
                 Asset::transfer_by_custodian(
                     custodian_signed.clone(),
-                    token.name.clone(),
+                    ticker,
                     investor1_did,
                     custodian_did,
                     investor2_did,
@@ -2423,7 +2419,7 @@ mod tests {
             // Successfully transfer by the custodian
             assert_ok!(Asset::transfer_by_custodian(
                 custodian_signed.clone(),
-                token.name.clone(),
+                ticker,
                 investor1_did,
                 custodian_did,
                 investor2_did,
@@ -2474,7 +2470,7 @@ mod tests {
                 assert_ok!(GeneralTM::add_active_rule(
                     owner_signed.clone(),
                     owner_did,
-                    token.name.clone(),
+                    ticker,
                     asset_rule
                 ));
 
@@ -2495,7 +2491,7 @@ mod tests {
                         assert_ok!(Asset::transfer(
                             owner_signed.clone(),
                             owner_did,
-                            token.name.clone(),
+                            ticker,
                             bob_did,
                             1
                         ));
@@ -2503,55 +2499,46 @@ mod tests {
                     assert_ok!(Asset::create_checkpoint(
                         owner_signed.clone(),
                         owner_did,
-                        token.name.clone(),
+                        ticker,
                     ));
                     let x: u64 = u64::try_from(j).unwrap();
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, owner_did, 0),
+                        Asset::get_balance_at(&ticker, owner_did, 0),
                         owner_balance[j]
                     );
+                    assert_eq!(Asset::get_balance_at(&ticker, bob_did, 0), bob_balance[j]);
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, bob_did, 0),
-                        bob_balance[j]
-                    );
-                    assert_eq!(
-                        Asset::get_balance_at(&token.name, owner_did, 1),
+                        Asset::get_balance_at(&ticker, owner_did, 1),
                         owner_balance[1]
                     );
+                    assert_eq!(Asset::get_balance_at(&ticker, bob_did, 1), bob_balance[1]);
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, bob_did, 1),
-                        bob_balance[1]
-                    );
-                    assert_eq!(
-                        Asset::get_balance_at(&token.name, owner_did, x - 1),
+                        Asset::get_balance_at(&ticker, owner_did, x - 1),
                         owner_balance[j - 1]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, bob_did, x - 1),
+                        Asset::get_balance_at(&ticker, bob_did, x - 1),
                         bob_balance[j - 1]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, owner_did, x),
+                        Asset::get_balance_at(&ticker, owner_did, x),
+                        owner_balance[j]
+                    );
+                    assert_eq!(Asset::get_balance_at(&ticker, bob_did, x), bob_balance[j]);
+                    assert_eq!(
+                        Asset::get_balance_at(&ticker, owner_did, x + 1),
                         owner_balance[j]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, bob_did, x),
+                        Asset::get_balance_at(&ticker, bob_did, x + 1),
                         bob_balance[j]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, owner_did, x + 1),
+                        Asset::get_balance_at(&ticker, owner_did, 1000),
                         owner_balance[j]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&token.name, bob_did, x + 1),
-                        bob_balance[j]
-                    );
-                    assert_eq!(
-                        Asset::get_balance_at(&token.name, owner_did, 1000),
-                        owner_balance[j]
-                    );
-                    assert_eq!(
-                        Asset::get_balance_at(&token.name, bob_did, 1000),
+                        Asset::get_balance_at(&ticker, bob_did, 1000),
                         bob_balance[j]
                     );
                 }
@@ -2587,24 +2574,21 @@ mod tests {
                 true
             ));
 
-            assert_eq!(
-                Asset::is_ticker_registry_valid(&token.name, owner_did),
-                true
-            );
+            assert_eq!(Asset::is_ticker_registry_valid(&ticker, owner_did), true);
             assert_eq!(Asset::is_ticker_available(&ticker), false);
 
             assert_err!(
-                Asset::register_ticker(owner_signed.clone(), vec![0x01]),
+                Asset::register_ticker(owner_signed.clone(), Ticker::from_slice(&[0x01])),
                 "token already created"
             );
 
             assert_err!(
                 Asset::register_ticker(
                     owner_signed.clone(),
-                    vec![
+                    Ticker::from_slice(&[
                         0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
                         0x01
-                    ]
+                    ])
                 ),
                 "ticker length over the limit"
             );
@@ -2816,7 +2800,7 @@ mod tests {
             Identity::add_auth(
                 Signer::from(alice_did),
                 Signer::from(bob_did),
-                AuthorizationData::TransferTokenOwnership(vec![0x50]),
+                AuthorizationData::TransferTokenOwnership(Ticker::from_slice(&[0x50])),
                 Some(now.timestamp() as u64 + 100),
             );
             auth_id = Identity::last_authorization(Signer::from(bob_did));
