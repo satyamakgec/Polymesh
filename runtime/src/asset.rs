@@ -1853,7 +1853,7 @@ mod tests {
             asset_creation_fee: 0,
             ticker_registration_fee: 0,
             ticker_registration_config: TickerRegistrationConfig {
-                max_ticker_length: 12,
+                max_ticker_length: 8,
                 registration_length: Some(10000),
             },
             fee_collector: AccountKeyring::Dave.public().into(),
@@ -1888,10 +1888,10 @@ mod tests {
                 total_supply: 1_000_000,
                 divisible: true,
             };
-            assert!(!<identity::DidRecords>::exists(
-                Identity::get_token_did(&token.name).unwrap()
-            ));
             let ticker = Ticker::from_slice(token.name.as_slice());
+            assert!(!<identity::DidRecords>::exists(
+                Identity::get_token_did(&ticker).unwrap()
+            ));
             assert_err!(
                 Asset::create_token(
                     owner_signed.clone(),
@@ -1915,10 +1915,10 @@ mod tests {
             ));
 
             // A correct entry is added
-            assert_eq!(Asset::token_details(token.name.clone()), token);
+            assert_eq!(Asset::token_details(ticker), token);
             //assert!(Identity::is_existing_identity(Identity::get_token_did(&token.name).unwrap()));
             assert!(<identity::DidRecords>::exists(
-                Identity::get_token_did(&token.name).unwrap()
+                Identity::get_token_did(&ticker).unwrap()
             ));
             assert_eq!(Asset::token_details(ticker), token);
 
@@ -2008,7 +2008,7 @@ mod tests {
             ));
 
             // A correct entry is added
-            assert_eq!(Asset::token_details(token.name.clone()), token);
+            assert_eq!(Asset::token_details(ticker), token);
 
             let asset_rule = general_tm::AssetRule {
                 sender_rules: vec![],
@@ -2019,14 +2019,14 @@ mod tests {
             assert_ok!(GeneralTM::add_active_rule(
                 owner_signed.clone(),
                 owner_did,
-                token.name.clone(),
+                ticker,
                 asset_rule
             ));
 
             assert_ok!(Asset::transfer(
                 owner_signed.clone(),
                 owner_did,
-                token.name.clone(),
+                ticker,
                 alice_did,
                 500
             ));
@@ -2108,7 +2108,7 @@ mod tests {
             ));
 
             assert_eq!(
-                Asset::balance_of((token.name.clone(), investor1_did)),
+                Asset::balance_of((ticker, investor1_did)),
                 200_00_00 as u128
             );
 
@@ -2374,7 +2374,7 @@ mod tests {
             ));
 
             assert_eq!(
-                Asset::balance_of((token.name.clone(), investor2_did)),
+                Asset::balance_of((ticker, investor2_did)),
                 140_00_00 as u128
             );
 
@@ -2503,44 +2503,41 @@ mod tests {
                     ));
                     let x: u64 = u64::try_from(j).unwrap();
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, owner_did, 0),
+                        Asset::get_balance_at(ticker, owner_did, 0),
                         owner_balance[j]
                     );
-                    assert_eq!(Asset::get_balance_at(&ticker, bob_did, 0), bob_balance[j]);
+                    assert_eq!(Asset::get_balance_at(ticker, bob_did, 0), bob_balance[j]);
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, owner_did, 1),
+                        Asset::get_balance_at(ticker, owner_did, 1),
                         owner_balance[1]
                     );
-                    assert_eq!(Asset::get_balance_at(&ticker, bob_did, 1), bob_balance[1]);
+                    assert_eq!(Asset::get_balance_at(ticker, bob_did, 1), bob_balance[1]);
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, owner_did, x - 1),
+                        Asset::get_balance_at(ticker, owner_did, x - 1),
                         owner_balance[j - 1]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, bob_did, x - 1),
+                        Asset::get_balance_at(ticker, bob_did, x - 1),
                         bob_balance[j - 1]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, owner_did, x),
+                        Asset::get_balance_at(ticker, owner_did, x),
                         owner_balance[j]
                     );
-                    assert_eq!(Asset::get_balance_at(&ticker, bob_did, x), bob_balance[j]);
+                    assert_eq!(Asset::get_balance_at(ticker, bob_did, x), bob_balance[j]);
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, owner_did, x + 1),
+                        Asset::get_balance_at(ticker, owner_did, x + 1),
                         owner_balance[j]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, bob_did, x + 1),
+                        Asset::get_balance_at(ticker, bob_did, x + 1),
                         bob_balance[j]
                     );
                     assert_eq!(
-                        Asset::get_balance_at(&ticker, owner_did, 1000),
+                        Asset::get_balance_at(ticker, owner_did, 1000),
                         owner_balance[j]
                     );
-                    assert_eq!(
-                        Asset::get_balance_at(&ticker, bob_did, 1000),
-                        bob_balance[j]
-                    );
+                    assert_eq!(Asset::get_balance_at(ticker, bob_did, 1000), bob_balance[j]);
                 }
             });
         }
@@ -2585,10 +2582,7 @@ mod tests {
             assert_err!(
                 Asset::register_ticker(
                     owner_signed.clone(),
-                    Ticker::from_slice(&[
-                        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                        0x01
-                    ])
+                    Ticker::from_slice(&[0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01])
                 ),
                 "ticker length over the limit"
             );
